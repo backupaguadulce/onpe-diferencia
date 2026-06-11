@@ -6,58 +6,77 @@
     <title>Diferencia ONPE en Vivo</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }
+        .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; word-wrap: break-word; }
         h3 { color: #555; margin-bottom: 5px; font-weight: normal; }
         h1 { font-size: 55px; margin: 10px 0; }
         .ganador { font-size: 24px; font-weight: bold; color: #333; }
         .footer { margin-top: 20px; font-size: 12px; color: #999; }
         #loading { color: #005cbb; font-weight: bold; }
+        .error-log { font-size: 11px; color: #ba1a1a; text-align: left; margin-top: 20px; background: #ffdad6; padding: 10px; border-radius: 5px; font-family: monospace; }
     </style>
 </head>
 <body>
     <div class="card" id="tarjeta">
-        <h3 id="loading">Conectando con la ONPE en tiempo real...</h3>
+        <h3 id="loading">Conectando con la ONPE a través de 3 vías seguras...</h3>
     </div>
 
     <script>
-        // 1. PEGA AQUÍ TU ENLACE LARGO DE LA ONPE (EL DEL ARCHIVO CON LLAVES {})
+        // 1. PEGA AQUÍ TU ENLACE DE LA ONPE (EL QUE TIENE LAS LLAVES {})
         const urlONPE = "https://resultadosegundavuelta.onpe.gob.pe/presentacion-backend/resumen-general/totales?idEleccion=10&tipoFiltro=eleccion";
         
-        // Usamos un túnel Proxy gratuito para evadir el escudo de la ONPE
-        const urlProxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent(urlONPE);
+        // Tres túneles diferentes para evadir escudos
+        const proxies = [
+            "https://corsproxy.io/?",
+            "https://api.allorigins.win/raw?url=",
+            "https://api.codetabs.com/v1/proxy?quest="
+        ];
 
         async function obtenerDatos() {
-            try {
-                const respuesta = await fetch(urlProxy);
-                const texto = await respuesta.text();
-                
-                // Limpiamos comas
-                const textoLimpio = texto.replace(/,/g, '').replace(/\./g, '');
+            let errorLog = "";
+            let exito = false;
 
-                // Buscamos a los candidatos
-                const matchRoberto = textoLimpio.match(/S[AÁaá]NCHEZ\D*?(\d{6,8})/i);
-                const matchKeiko = textoLimpio.match(/FUJIMORI\D*?(\d{6,8})/i);
-
-                if (matchRoberto && matchKeiko) {
-                    const votosRoberto = parseInt(matchRoberto[1], 10);
-                    const votosKeiko = parseInt(matchKeiko[1], 10);
-                    const diferencia = Math.abs(votosRoberto - votosKeiko);
+            for (let proxy of proxies) {
+                if (exito) break;
+                try {
+                    const respuesta = await fetch(proxy + encodeURIComponent(urlONPE));
+                    if (!respuesta.ok) throw new Error("Bloqueado por el servidor (Error " + respuesta.status + ")");
                     
-                    const ganador = votosRoberto > votosKeiko ? "Roberto Sánchez" : "Keiko Fujimori";
-                    const color = votosRoberto > votosKeiko ? "#d32f2f" : "#f57c00";
-                    const diferenciaStr = diferencia.toLocaleString('en-US');
+                    const texto = await respuesta.text();
+                    const textoLimpio = texto.replace(/,/g, '').replace(/\./g, '');
 
-                    document.getElementById('tarjeta').innerHTML = `
-                        <h3>Diferencia actual de votos:</h3>
-                        <h1 style="color: ${color};">${diferenciaStr}</h1>
-                        <div class="ganador">A favor de:<br><span style="color: ${color};">${ganador}</span></div>
-                        <div class="footer">Actualizado EN VIVO al abrir el enlace ⚡</div>
-                    `;
-                } else {
-                    document.getElementById('tarjeta').innerHTML = "<h3>Error al leer los votos. La ONPE pudo haber cambiado el formato.</h3>";
+                    const matchRoberto = textoLimpio.match(/S[AÁaá]NCHEZ\D*?(\d{6,8})/i);
+                    const matchKeiko = textoLimpio.match(/FUJIMORI\D*?(\d{6,8})/i);
+
+                    if (matchRoberto && matchKeiko) {
+                        const votosRoberto = parseInt(matchRoberto[1], 10);
+                        const votosKeiko = parseInt(matchKeiko[1], 10);
+                        const diferencia = Math.abs(votosRoberto - votosKeiko);
+                        
+                        const ganador = votosRoberto > votosKeiko ? "Roberto Sánchez" : "Keiko Fujimori";
+                        const color = votosRoberto > votosKeiko ? "#d32f2f" : "#f57c00";
+                        const diferenciaStr = diferencia.toLocaleString('en-US');
+
+                        document.getElementById('tarjeta').innerHTML = `
+                            <h3>Diferencia actual de votos:</h3>
+                            <h1 style="color: ${color};">${diferenciaStr}</h1>
+                            <div class="ganador">A favor de:<br><span style="color: ${color};">${ganador}</span></div>
+                            <div class="footer">Actualizado EN VIVO al abrir el enlace ⚡</div>
+                        `;
+                        exito = true;
+                    } else {
+                        // Si entra aquí, significa que la ONPE no nos dio los votos, sino otra página.
+                        throw new Error("No se encontraron los votos. Datos recibidos: " + texto.substring(0, 50) + "...");
+                    }
+                } catch (error) {
+                    errorLog += `[Fallo en ${proxy.split('/')[2]}]: ${error.message}<br>`;
                 }
-            } catch (error) {
-                document.getElementById('tarjeta').innerHTML = "<h3>El servidor de la ONPE está saturado. Recarga la página.</h3>";
+            }
+
+            if (!exito) {
+                document.getElementById('tarjeta').innerHTML = `
+                    <h3>No se pudo acceder a la ONPE en vivo.</h3>
+                    <div class="error-log"><strong>Reporte del escáner:</strong><br>${errorLog}</div>
+                `;
             }
         }
 
