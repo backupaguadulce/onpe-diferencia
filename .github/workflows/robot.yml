@@ -1,0 +1,26 @@
+name: Robot ONPE
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Instalar Navegador
+        run: pip install selenium
+      - name: Ejecutar Robot
+        run: python script.py
+      - name: Subir a la Web
+        run: |
+          git config --global user.name "Robot ONPE"
+          git config --global user.email "robot@onpe.com"
+          git add index.html
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Votos actualizados" && git push)
