@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diferencia ONPE en Vivo</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }
+        h3 { color: #555; margin-bottom: 5px; font-weight: normal; }
+        h1 { font-size: 55px; margin: 10px 0; }
+        .ganador { font-size: 24px; font-weight: bold; color: #333; }
+        .footer { margin-top: 20px; font-size: 12px; color: #999; }
+        #loading { color: #005cbb; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card" id="tarjeta">
+        <h3 id="loading">Conectando con la ONPE en tiempo real...</h3>
+    </div>
+
+    <script>
+        // 1. PEGA AQUÍ TU ENLACE LARGO DE LA ONPE (EL DEL ARCHIVO CON LLAVES {})
+        const urlONPE = "https://resultadosegundavuelta.onpe.gob.pe/presentacion-backend/resumen-general/totales?idEleccion=10&tipoFiltro=eleccion";
+        
+        // Usamos un túnel Proxy gratuito para evadir el escudo de la ONPE
+        const urlProxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent(urlONPE);
+
+        async function obtenerDatos() {
+            try {
+                const respuesta = await fetch(urlProxy);
+                const texto = await respuesta.text();
+                
+                // Limpiamos comas
+                const textoLimpio = texto.replace(/,/g, '').replace(/\./g, '');
+
+                // Buscamos a los candidatos
+                const matchRoberto = textoLimpio.match(/S[AÁaá]NCHEZ\D*?(\d{6,8})/i);
+                const matchKeiko = textoLimpio.match(/FUJIMORI\D*?(\d{6,8})/i);
+
+                if (matchRoberto && matchKeiko) {
+                    const votosRoberto = parseInt(matchRoberto[1], 10);
+                    const votosKeiko = parseInt(matchKeiko[1], 10);
+                    const diferencia = Math.abs(votosRoberto - votosKeiko);
+                    
+                    const ganador = votosRoberto > votosKeiko ? "Roberto Sánchez" : "Keiko Fujimori";
+                    const color = votosRoberto > votosKeiko ? "#d32f2f" : "#f57c00";
+                    const diferenciaStr = diferencia.toLocaleString('en-US');
+
+                    document.getElementById('tarjeta').innerHTML = `
+                        <h3>Diferencia actual de votos:</h3>
+                        <h1 style="color: ${color};">${diferenciaStr}</h1>
+                        <div class="ganador">A favor de:<br><span style="color: ${color};">${ganador}</span></div>
+                        <div class="footer">Actualizado EN VIVO al abrir el enlace ⚡</div>
+                    `;
+                } else {
+                    document.getElementById('tarjeta').innerHTML = "<h3>Error al leer los votos. La ONPE pudo haber cambiado el formato.</h3>";
+                }
+            } catch (error) {
+                document.getElementById('tarjeta').innerHTML = "<h3>El servidor de la ONPE está saturado. Recarga la página.</h3>";
+            }
+        }
+
+        obtenerDatos();
+    </script>
+</body>
+</html>
